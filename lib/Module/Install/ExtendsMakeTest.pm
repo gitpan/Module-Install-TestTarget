@@ -2,7 +2,7 @@ package Module::Install::ExtendsMakeTest;
 use 5.006_002;
 use strict;
 #use warnings; # XXX: warnings.pm produces a lot of 'redefine' warnings!
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 sub _deprecated {
     print STDERR <<EOM;
@@ -234,14 +234,14 @@ Sets scripts to run before running C<test_harness()>.
   # `make test` will be something like this:
   perl -MExtUtils::Command::MM -e "do 'tool/before_run_script.pl; test_harness(0, 'inc')" t/*t
 
-=item C<< after_run_script => \@scripts >>
+=item C<< after_run_scripts => \@scripts >>
 
 Sets scripts to run after running C<test_harness()>.
 
   use inc::Module::Install;
   tests 't/*t';
   extends_make_test(
-      after_run_script => ['tool/after_run_script.pl'],
+      after_run_scripts => ['tool/after_run_script.pl'],
   );
   
   # `make test` will be something like this:
