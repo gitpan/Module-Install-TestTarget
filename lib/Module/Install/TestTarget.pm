@@ -2,7 +2,7 @@ package Module::Install::TestTarget;
 use 5.006_002;
 use strict;
 #use warnings; # XXX: warnings.pm produces a lot of 'redefine' warnings!
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 use base qw(Module::Install::Base);
 use Config;
@@ -64,7 +64,8 @@ sub _build_command_parts {
     $test{load_modules}  = @{$args{load_modules}}  ? join '', map { qq|"-M$_" | } @{$args{load_modules}}  : '';
     $test{tests}    = @{$args{tests}}    ? join '', map { qq|"$_" |   } @{$args{tests}}    : '$(TEST_FILES)';
     for my $key (qw/run_on_prepare run_on_finalize/) {
-        $test{$key} = @{$args{$key}} ? join '', map { qq|do '$_'; | } @{$args{$key}} : '';
+        $test{$key} = @{$args{$key}} ? join '', map { qq|do { local \$@; do '$_'; die \$@ if \$@ }; | } @{$args{$key}} : '';
+        $test{$key} = _quote($test{$key});
     }
     for my $key (qw/insert_on_prepare insert_on_finalize/) {
         my $codes = join '', map { _build_funcall($_) } @{$args{$key}};
@@ -123,7 +124,7 @@ sub _assemble {
             $args{env},
             $args{run_on_prepare},
             $args{insert_on_prepare},
-            $2,
+            "$2; ",
             $args{run_on_finalize},
             $args{insert_on_finalize},
             $3,
@@ -179,7 +180,7 @@ inside Makefile.PL:
   );
 
   # above target 'foo' will turn into something like:
-  perl "-MExtUtils::Command::MM" "-I/home/xaicron/perl5/lib" "-MFoo" "-MBar" "-e" "do 'before.pl'; sub { print \"start -> \", scalar localtime, \"\n\" }->(); test_harness(0, 'inc'); do 'after.pl'; sub { print \"end -> \", scalar localtime, \"\n\" }->();" t/baz/*t
+  perl "-MExtUtils::Command::MM" "-I/home/xaicron/perl5/lib" "-MFoo" "-MBar" "-e" "do { local \$@; do 'before.pl'; die \$@ if $@ }; sub { print \"start -> \", scalar localtime, \"\n\" }->(); test_harness(0, 'inc'); do { local \$@; do 'after.pl'; die \$@ if \$@ }; sub { print \"end -> \", scalar localtime, \"\n\" }->();" t/baz/*t
 
 =head1 DESCRIPTION
 
@@ -264,7 +265,7 @@ Sets scripts to run before running C<test_harness()>.
   );
   
   # `make foo` will be something like this:
-  perl -MExtUtils::Command::MM -e "do 'tool/run_on_prepare.pl; test_harness(0, 'inc')" t/*t
+  perl -MExtUtils::Command::MM -e "do { local \$@; do 'tool/run_on_prepare.pl; die \$@ if \$@ }; test_harness(0, 'inc')" t/*t
 
 =item C<< run_on_prepare => \@scripts >>
 
@@ -273,11 +274,11 @@ Sets scripts to run after running C<test_harness()>.
   use inc::Module::Install;
   tests 't/*t';
   test_taget foo => (
-      run_on_prepare => ['tool/run_on_prepare.pl'],
+      run_on_after=> ['tool/run_on_after.pl'],
   );
   
   # `make foo` will be something like this:
-  perl -MExtUtils::Command::MM -e "test_harness(0, 'inc'); do 'tool/run_on_prepare.pl;" t/*t
+  perl -MExtUtils::Command::MM -e "do { local \$@; do 'tool/run_on_after.pl; die \$@ if \$@ }; test_harness(0, 'inc')" t/*t
 
 =item C<< insert_on_prepare => \@codes >>
 
@@ -319,7 +320,7 @@ Sets an alias of the test.
   );
   
   # `make test_pp` and `make testall` will be something like this:
-  perl -MExtUtils::Command::MM -e "do 'tool/force-pp.pl'; test_harness(0, 'inc')" t/*t
+  perl -MExtUtils::Command::MM -e "do { local \$@; do 'tool/force-pp.pl'; die \$@; if \$@ }; test_harness(0, 'inc')" t/*t
 
 =item C<< env => \%env >>
 
