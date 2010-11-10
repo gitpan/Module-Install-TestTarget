@@ -2,7 +2,7 @@ package Module::Install::TestTarget;
 use 5.006_002;
 use strict;
 #use warnings; # XXX: warnings.pm produces a lot of 'redefine' warnings!
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 use base qw(Module::Install::Base);
 use Config;
@@ -31,11 +31,17 @@ sub default_test_target {
 sub test_target {
     my ($self, $target, %args) = @_;
     croak 'target must be spesiced at test_target()' unless $target;
-    my $alias = $args{alias}  || '';
+    my $alias = "\n";
+
+    if($args{alias}) {
+        $alias .= qq{$args{alias} :: $target\n\n};
+    }
+    if($Module::Install::AUTHOR && $args{alias_for_author}) {
+        $alias .= qq{$args{alias_for_author} :: $target\n\n};
+    }
 
     my $test = _assemble(_build_command_parts(%args));
 
-    $alias = $alias ? qq{\n$alias :: $target\n\n} : qq{\n};
     $self->postamble(
           $alias
         . qq{$target :: pure_all\n}
@@ -46,7 +52,7 @@ sub test_target {
 sub _build_command_parts {
     my %args = @_;
 
-    #XXX: _build_command_parts() will be called first, so we put ithere
+    #XXX: _build_command_parts() will be called first, so we put it here
     unless(defined $ORIG_TEST_VIA_HARNESS) {
         $ORIG_TEST_VIA_HARNESS = MY->can('test_via_harness');
         no warnings 'redefine';
@@ -62,7 +68,11 @@ sub _build_command_parts {
     my %test;
     $test{includes} = @{$args{includes}} ? join '', map { qq|"-I$_" | } @{$args{includes}} : '';
     $test{load_modules}  = @{$args{load_modules}}  ? join '', map { qq|"-M$_" | } @{$args{load_modules}}  : '';
-    $test{tests}    = @{$args{tests}}    ? join '', map { qq|"$_" |   } @{$args{tests}}    : '$(TEST_FILES)';
+
+    $test{tests} =  @{$args{tests}}
+        ? join '', map { qq|"$_" | } @{$args{tests}}
+        : '$(TEST_FILES)';
+
     for my $key (qw/run_on_prepare run_on_finalize/) {
         $test{$key} = @{$args{$key}} ? join '', map { qq|do { local \$@; do '$_'; die \$@ if \$@ }; | } @{$args{$key}} : '';
         $test{$key} = _quote($test{$key});
@@ -119,7 +129,11 @@ sub _assemble {
     $command =~ s/("- \S+? ")/$args{includes}$args{load_modules}$1/xms;
 
     # inject snipetts in the one-liner
-    $command =~ s{("-e" \s+ ") (.+) (")}{
+    $command =~ s{
+        ( "-e" \s+ ")          # start the one liner
+        ( (?: [^"] | \\ . )+ ) # body of the one liner
+        ( " )                  # end the one liner
+     }{
         join '', $1,
             $args{env},
             $args{run_on_prepare},
@@ -145,7 +159,7 @@ __END__
 
 =head1 NAME
 
-Module::Install::TestTarget - Assembles Custom Test Targets For `make` 
+Module::Install::TestTarget - Assembles Custom Test Targets For `make`
 
 =head1 SYNOPSIS
 
@@ -165,7 +179,7 @@ inside Makefile.PL:
       tests              => ['t/baz/*t'],
       env                => { PERL_ONLY => 1 },
   ;
-  
+
   # create a new test target (allows `make foo`)
   test_target foo => (
       includes           => ["$ENV{HOME}/perl5/lib"],
@@ -217,7 +231,7 @@ Then in your Makefile.PL, simply specify that you want to run this script before
         run_on_prepare => [ 't/start_mysqld.pl' ]
     );
 
-Since the script is going to be executed in global scope, $mysqld will stay 
+Since the script is going to be executed in global scope, $mysqld will stay
 active during the execution of your tests -- the mysqld instance that came
 up will shutdown automatically after the tests are executed.
 
@@ -252,7 +266,7 @@ Sets modules which are loaded before running C<test_harness()>.
   test_taget foo => (
       load_modules => ['Foo', 'Bar::Baz'],
   );
-  
+
   # `make test` will be something like this:
   perl -MFoo -MBar::Baz -MExtUtils::Command::MM -e "test_harness(0, 'inc')" t/*t
 
@@ -263,7 +277,7 @@ Sets scripts to run before running C<test_harness()>.
   test_taget foo => (
       run_on_prepare => ['tool/run_on_prepare.pl'],
   );
-  
+
   # `make foo` will be something like this:
   perl -MExtUtils::Command::MM -e "do { local \$@; do 'tool/run_on_prepare.pl; die \$@ if \$@ }; test_harness(0, 'inc')" t/*t
 
@@ -276,7 +290,7 @@ Sets scripts to run after running C<test_harness()>.
   test_taget foo => (
       run_on_after=> ['tool/run_on_after.pl'],
   );
-  
+
   # `make foo` will be something like this:
   perl -MExtUtils::Command::MM -e "do { local \$@; do 'tool/run_on_after.pl; die \$@ if \$@ }; test_harness(0, 'inc')" t/*t
 
@@ -289,7 +303,7 @@ Sets perl codes to run before running C<test_harness()>.
   test_taget foo => (
       insert_on_prepare => ['print scalar localtime , "\n"', sub { system qw/cat README/ }],
   );
-  
+
   # `make foo` will be something like this:
   perl -MExtUtils::Command::MM "sub { print scalar localtme, "\n" }->(); sub { system 'cat', 'README' }->(); test_harness(0, 'inc')" t/*t
 
@@ -304,7 +318,7 @@ Sets perl codes to run after running C<test_harness()>.
   test_taget foo => (
       insert_on_finalize => ['print scalar localtime , "\n"', sub { system qw/cat README/ }],
   );
-  
+
   # `make foo` will be something like this:
   perl -MExtUtils::Command::MM "test_harness(0, 'inc'); sub { print scalar localtme, "\n" }->(); sub { system 'cat', 'README' }->();" t/*t
 
@@ -318,9 +332,13 @@ Sets an alias of the test.
       run_on_prepare => 'tool/force-pp.pl',
       alias          => 'testall',
   );
-  
+
   # `make test_pp` and `make testall` will be something like this:
   perl -MExtUtils::Command::MM -e "do { local \$@; do 'tool/force-pp.pl'; die \$@; if \$@ }; test_harness(0, 'inc')" t/*t
+
+=item C<< alias_for_author => $name >>
+
+The same as C<alias>, but only enabled if it is in author's environment.
 
 =item C<< env => \%env >>
 
@@ -331,7 +349,7 @@ Sets environment variables.
           FOO => 'bar',
       },
   );
-  
+
   # `make foo` will be something like this:
   perl -MExtUtils::Command::MM -e "\$ENV{q{FOO}} = q{bar}; test_harness(0, 'inc')" t/*t
 
