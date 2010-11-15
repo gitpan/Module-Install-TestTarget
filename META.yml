@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Module-Install-TestTarget
-version:            0.14
+version:            0.15
 abstract:           Assembles test targets for `make` with code snippets
 author:  []
 license:            perl
@@ -10,11 +10,9 @@ configure_requires:
 build_requires:
     ExtUtils::MakeMaker:  0
 requires:
-    ExtUtils::Install:    1.43
-    ExtUtils::MakeMaker:  6.31
-    Module::Install:      1
-    Test::More:           0.96
-    Test::Requires:       0
+    Module::Install:  1.00
+    Test::More:       0.96
+    Test::Requires:   0
 no_index:
     directory:
         - t
