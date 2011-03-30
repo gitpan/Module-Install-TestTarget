@@ -2,7 +2,7 @@ package Module::Install::TestTarget;
 use 5.006_002;
 use strict;
 #use warnings; # XXX: warnings.pm produces a lot of 'redefine' warnings!
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 use base qw(Module::Install::Base);
 use Config;
@@ -107,7 +107,7 @@ sub _quote {
     $code =~ s/\n/ /g;
     if ($^O eq 'MSWin32') {
         $code =~ s/\\\$\$/\$\$/g;
-        if ($Config{make} =~ /dmake/) {
+        if ($Config{make} =~ /dmake/i) {
             $code =~ s/{/{{/g;
             $code =~ s/}/}}/g;
         }
