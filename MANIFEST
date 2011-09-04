@@ -21,3 +21,4 @@ xt/02_pod.t
 xt/03_pod-coverage.t
 xt/04_perlcritic.t
 xt/perlcriticrc
+META.json                                Module JSON meta-data (added by MakeMaker)
